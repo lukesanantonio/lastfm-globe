@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/lukesanantonio/lastfm-globe/issues"
   },
-  "homepage": "https://github.com/lukesanantonio/lastfm-globe"
+  "homepage": "https://github.com/lukesanantonio/lastfm-globe",
+  "dependencies": {
+    "express": "^4.15.3"
+  }
 }
