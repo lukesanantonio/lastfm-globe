@@ -1,10 +1,14 @@
 const express = require('express');
+const path = require('path');
 const app = express();
 
 const LastFM = require('./lib/lastfm.js');
 const LFM_Globe = require('./lfm-globe-secret.js');
 
 app.set('view engine', 'pug');
+
+app.use('/static', express.static(path.join(__dirname + '/static')));
+app.use('/public', express.static(path.join(__dirname + '/public')));
 
 app.get('/', function (req, res) {
     res.render('index');
