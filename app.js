@@ -20,14 +20,18 @@ app.get('/lastfm_cb', function(req, res) {
         LFM_Globe.API_KEY, LFM_Globe.API_SECRET
     );
     lfm.auth_getSession(token).then(function(obj) {
-        const user_key = obj.session.key;
-        const user_name = obj.session.name;
-
         // Okay, we've authenticated
-        res.send("Success, " + user_name + ", your key is " + user_key);
+        const user_key = obj.session.key;
+
+        // Prompt the user to find their location
+        res.redirect('/locate?api_key='+user_key);
     }).catch(function(err) {
         res.send("error response: " + JSON.stringify(err));
     });
+});
+
+app.get('/locate', function(req, res) {
+    res.render('locate');
 });
 
 app.listen(8080, function() {

@@ -1,0 +1,73 @@
+body {
+    margin: 0;
+    padding: 0;
+}
+#toolbar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+}
+#cesiumContainer {
+    width: 100%;
+    height: 100%;
+    display: block;
+    padding: 0;
+}
+.prompt-container {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+
+    width: 725px;
+    height: 250px;
+    margin: auto;
+
+    background-color: #EEEDE3;
+    border: 2px solid #A9AAC1;
+    border-radius: 3px;
+
+    display: flex;
+    flex-direction: column;
+}
+.prompt-button-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+}
+.prompt {
+    font-size:1.6em;
+    font-weight: bold;
+    font-family: sans;
+
+    display: block;
+    text-align: center;
+}
+.prompt-button {
+    background-color: #6D63A6;
+    border: 2px solid #6D63A6;
+
+    font-size: 1.5em;
+    color: white;
+    text-decoration: none;
+
+    margin: .5em;
+    padding: 1em 2em;
+    border-radius: 3px;
+
+    text-align: center;
+    display: inline-block;
+
+    width: 50%;
+}
+.prompt-button:hover {
+    background-color: #5b557f;
+    transition: background-color .2s;
+    cursor: pointer;
+}
