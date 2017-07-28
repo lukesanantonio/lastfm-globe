@@ -12,7 +12,7 @@ cd public/cesium
 
 archive="cesium.zip"
 
-curl http://cesiumjs.org/releases/Cesium-1.32.zip -o $archive
+curl http://cesiumjs.org/releases/Cesium-1.35.zip -o $archive
 
 mkdir -p Build Source
 
