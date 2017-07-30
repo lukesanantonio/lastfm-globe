@@ -150,7 +150,7 @@ function enable_location_picking_mode(viewer, options) {
     });
 }
 
-window.addEventListener('load', function() {
+document.addEventListener('DOMContentLoaded', function() {
     var imageryProvider = new Cesium.BingMapsImageryProvider({
         url: 'https://dev.virtualearth.net',
         key: 'AmSMXKlAR0oa-6-XVoqoYvF4dE_OHIFaZkOaSOk348ZETNf8aHhPcN-ynso3EG0X'
