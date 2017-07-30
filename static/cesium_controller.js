@@ -1,3 +1,5 @@
+const url_params = new URLSearchParams(window.location.search);
+
 function show_prompt(prompt_text, options) {
     var container = document.createElement('div');
     container.className = 'prompt-container';
@@ -95,20 +97,56 @@ function enable_location_picking_mode(viewer, options) {
             Cesium.ScreenSpaceEventType.MOUSE_MOVE
         );
 
-        // Remove lock-in button
-        tbar.remove(btn);
+        // Convert to cartographic.
+        var cartographic_pos = Cesium.Cartographic.fromCartesian(
+            marker.position.getValue(Cesium.getTimestamp())
+        );
+        data = {
+            longitude: Cesium.Math.toDegrees(cartographic_pos.longitude),
+            latitude: Cesium.Math.toDegrees(cartographic_pos.latitude),
+            key: url_params.get('api_key'),
+        };
 
         // Record position
-        console.log(pos);
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function(val) {
+            console.log(xhttp);
+            if(xhttp.readyState === XMLHttpRequest.DONE) {
+                if(xhttp.status === 200) {
+                    // Success
 
-        // Link to viewer
-        show_prompt("Thanks!", {
-            "Show me the globe!": function() {
-                this.style.display = 'none';
+                    // Remove lock-in button
+                    tbar.remove(btn);
 
-                //enable_viewer();
+                    // Inform the user!
+                    show_prompt("Success!", {
+                       "OK": function() {
+                           this.style.display = 'none';
+
+                           // AHHH CALLBACK HELL
+
+                           // Link to viewer
+                           show_prompt("Thanks!", {
+                               "Show me the globe!": function() {
+                                   this.style.display = 'none';
+
+                                   //enable_viewer();
+                               }
+                           });
+                       }
+                    });
+                } else if(xhttp.status === 422) {
+                    show_prompt("Error: " + xhttp.responseText, {
+                        "OK": function() {
+                            this.style.display = 'none';
+                        }
+                    });
+                }
             }
-        });
+        };
+        xhttp.open('POST', '/set_key_location', true);
+        xhttp.setRequestHeader('Content-Type', 'application/json');
+        xhttp.send(JSON.stringify(data));
     });
 }
 
