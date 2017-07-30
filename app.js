@@ -13,6 +13,8 @@ var rclient = redis.createClient();
 const LastFM = require('./lib/lastfm.js');
 const LFM_Globe = require('./lfm-globe-secret.js');
 
+DEGREES_PER_KILOMETER = 111.325;
+
 app.set('view engine', 'pug');
 
 app.use('/static', express.static(path.join(__dirname + '/static')));
@@ -76,6 +78,41 @@ app.post('/set_key_location', async (req, res) => {
         res.status(422).send(err);
     }
 
+});
+
+app.get('/globe', async (req, res) => {
+    // Retrieve keys by location. Filter out by zoom level and other factors.
+
+    // Here's an idea.
+    // At large zoom levels, sample a few points scattered around the entire
+    // area of focus, then make many queries of smaller radii with a high limit
+    // on the number of results.
+
+    // At small zoom levels use the actual point of focus with a radis. Do this
+    // first unless it becomes too large.
+
+    var lat = req.query.latitude;
+    var long = req.query.longitude;
+    var zoom = req.query.zoom;
+
+    var results_radius = (360.0 / Math.pow(2.0, zoom)) * DEGREES_PER_KILOMETER;
+
+    var users = await rclient.georadiusAsync(
+        "lfg-geo", long, lat, results_radius, "km", "WITHCOORD"
+    );
+
+    var ret = [];
+
+    for (var i = 0; i < users.length; ++i) {
+        var user = users[i];
+
+        ret.push({
+            "longitude": user[1][0],
+            "latitude": user[1][1],
+        });
+    }
+    res.set('Content-Type', 'application/json');
+    res.send(JSON.stringify(ret));
 });
 
 app.get('/locate', function(req, res) {
