@@ -86,17 +86,6 @@ function enable_location_picking_mode(viewer, options) {
 
     // Enable lock-in button
     btn.addEventListener('click', function() {
-        // Disable events
-        viewer.screenSpaceEventHandler.removeInputAction(
-            Cesium.ScreenSpaceEventType.LEFT_DOWN
-        );
-        viewer.screenSpaceEventHandler.removeInputAction(
-            Cesium.ScreenSpaceEventType.LEFT_UP
-        );
-        viewer.screenSpaceEventHandler.removeInputAction(
-            Cesium.ScreenSpaceEventType.MOUSE_MOVE
-        );
-
         // Convert to cartographic.
         var cartographic_pos = Cesium.Cartographic.fromCartesian(
             marker.position.getValue(Cesium.getTimestamp())
@@ -117,6 +106,17 @@ function enable_location_picking_mode(viewer, options) {
 
                     // Remove lock-in button
                     tbar.remove(btn);
+
+                    // Disable events
+                    viewer.screenSpaceEventHandler.removeInputAction(
+                        Cesium.ScreenSpaceEventType.LEFT_DOWN
+                    );
+                    viewer.screenSpaceEventHandler.removeInputAction(
+                        Cesium.ScreenSpaceEventType.LEFT_UP
+                    );
+                    viewer.screenSpaceEventHandler.removeInputAction(
+                        Cesium.ScreenSpaceEventType.MOUSE_MOVE
+                    );
 
                     // Inform the user!
                     show_prompt("Success!", {
