@@ -1,5 +1,7 @@
 const express = require('express');
 const path = require('path');
+const bodyParser = require('body-parser');
+
 const app = express();
 
 const LastFM = require('./lib/lastfm.js');
@@ -9,6 +11,8 @@ app.set('view engine', 'pug');
 
 app.use('/static', express.static(path.join(__dirname + '/static')));
 app.use('/public', express.static(path.join(__dirname + '/public')));
+
+app.use(bodyParser.json());
 
 app.get('/', function (req, res) {
     res.render('index');
