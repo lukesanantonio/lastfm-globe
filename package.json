@@ -17,10 +17,12 @@
   },
   "homepage": "https://github.com/lukesanantonio/lastfm-globe",
   "dependencies": {
+    "bluebird": "^3.5.0",
     "body-parser": "^1.17.2",
     "express": "^4.15.3",
     "md5": "^2.2.1",
     "pug": "^2.0.0-rc.2",
+    "redis": "^2.7.1",
     "request": "^2.81.0"
   }
 }
