@@ -99,7 +99,6 @@ function enable_location_picking_mode(viewer, options) {
         // Record position
         var xhttp = new XMLHttpRequest();
         xhttp.onreadystatechange = function(val) {
-            console.log(xhttp);
             if(xhttp.readyState === XMLHttpRequest.DONE) {
                 if(xhttp.status === 200) {
                     // Success
