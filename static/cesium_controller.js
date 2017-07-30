@@ -43,6 +43,24 @@ function make_marker(viewer, pos) {
     return billboard;
 }
 
+function enable_viewer(viewer) {
+    // Start requesting users' data from the server.
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+        if(xhr.readyState === XMLHttpRequest.DONE) {
+            if(xhr.status == 200) {
+                var res = JSON.parse(xhr.responseText);
+                console.log(res);
+            }
+        }
+    };
+
+    // Figure out the user's current location and also attach event listener
+    // to camera so we know when to request more!
+    xhr.open('GET', '/globe?latitude=40.878116&longitude=-73.58883&zoom=8');
+    xhr.send();
+}
+
 function enable_location_picking_mode(viewer, options) {
     options = options || {};
 
@@ -129,7 +147,7 @@ function enable_location_picking_mode(viewer, options) {
                                "Show me the globe!": function() {
                                    this.style.display = 'none';
 
-                                   //enable_viewer();
+                                   enable_viewer(viewer);
                                }
                            });
                        }
