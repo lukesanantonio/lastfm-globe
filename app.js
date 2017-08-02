@@ -59,7 +59,18 @@ app.post('/set_key_location', async (req, res) => {
     var lat = req.body.latitude;
 
     try {
+        // While doing the geo stuff, make a request to the LastFM API and add
+        // user information to a separate hash / struct thing.
+        lfm.user_getInfo({sk: key}).then(async (res) => {
+            // Add user information for later query.
+            await rclient.hmsetAsync("sk:" + key,
+                "username", res.user.name,
+                "realname", res.user.realname
+            );
+        });
+
         var numKeysRemoved = await rclient.sremAsync('lfg-lost-keys', key);
+
         if(numKeysRemoved >= 1) {
             // Okay, attach geolocation to key
             var numKeysLocated = await rclient.geoaddAsync('lfg-geo', long, lat, key);
@@ -101,16 +112,27 @@ app.get('/globe', async (req, res) => {
         "lfg-geo", long, lat, results_radius, "km", "WITHCOORD"
     );
 
-    var ret = [];
+    var promises = [];
+    for (let i = 0; i < users.length; ++i) {
+        // For each user, asynchronously grab their user information and pair
+        // it with their location.
+        promises.push(new Promise(async (resolve, reject) => {
+            const user = users[i];
 
-    for (var i = 0; i < users.length; ++i) {
-        var user = users[i];
+            // Query user information by key
+            var user_obj = await rclient.hgetallAsync("sk:" + user[0]);
 
-        ret.push({
-            "longitude": user[1][0],
-            "latitude": user[1][1],
-        });
+            resolve({
+                "user": user_obj,
+                "longitude": user[1][0],
+                "latitude": user[1][1],
+            });
+        }));
     }
+
+    // Collect values
+    var ret = await Promise.all(promises);
+
     res.set('Content-Type', 'application/json');
     res.send(JSON.stringify(ret));
 });
