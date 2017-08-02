@@ -12,7 +12,9 @@ var rclient = redis.createClient();
 
 const LastFM = require('./lib/lastfm.js');
 const LFM_Globe = require('./lfm-globe-secret.js');
-
+var lfm = new LastFM(
+    LFM_Globe.API_KEY, LFM_Globe.API_SECRET
+);
 DEGREES_PER_KILOMETER = 111.325;
 
 app.set('view engine', 'pug');
@@ -28,9 +30,7 @@ app.get('/', function (req, res) {
 
 app.get('/lastfm_cb', function(req, res) {
     const token = req.query.token;
-    var lfm = new LastFM(
-        LFM_Globe.API_KEY, LFM_Globe.API_SECRET
-    );
+
     lfm.auth_getSession(token).then(function(obj) {
         // Okay, we've authenticated
         const user_key = obj.session.key;
