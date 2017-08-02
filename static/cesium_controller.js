@@ -48,7 +48,7 @@ function enable_viewer(viewer) {
     var xhr = new XMLHttpRequest();
     xhr.onreadystatechange = function() {
         if(xhr.readyState === XMLHttpRequest.DONE) {
-            if(xhr.status == 200) {
+            if(xhr.status === 200) {
                 var res = JSON.parse(xhr.responseText);
                 console.log(res);
             }
