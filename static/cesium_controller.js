@@ -50,7 +50,20 @@ function enable_viewer(viewer) {
         if(xhr.readyState === XMLHttpRequest.DONE) {
             if(xhr.status === 200) {
                 var res = JSON.parse(xhr.responseText);
-                console.log(res);
+
+                var ellipsoid = viewer.scene.globe.ellipsoid;
+
+                for(var i = 0; i < res.length; ++i) {
+                    var user = res[i];
+
+                    var pos = Cesium.Cartographic.fromDegrees(
+                        user.longitude, user.latitude
+                    );
+
+                    user.marker = make_marker(
+                        viewer, ellipsoid.cartographicToCartesian(pos)
+                    );
+                }
             }
         }
     };
