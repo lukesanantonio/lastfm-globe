@@ -124,8 +124,8 @@ app.get('/globe', async (req, res) => {
 
             resolve({
                 "user": user_obj,
-                "longitude": user[1][0],
-                "latitude": user[1][1],
+                "longitude": parseFloat(user[1][0]),
+                "latitude": parseFloat(user[1][1]),
             });
         }));
     }
