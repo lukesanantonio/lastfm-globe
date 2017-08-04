@@ -121,6 +121,7 @@ app.get('/globe', async (req, res) => {
 
             // Query user information by key
             var user_obj = await rclient.hgetallAsync("sk:" + user[0]);
+            user_obj.key = user[0];
 
             resolve({
                 "user": user_obj,
