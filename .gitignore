@@ -4,5 +4,12 @@
 
 public/
 
+# Don't commit generated bundles
+static/*-bundle.js
+
+# Don't share Last.fm key and client secret!!
+lfm-globe-secret.js
+lastfm_api_details.txt
+
 # Node
 node_modules/
