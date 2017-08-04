@@ -142,6 +142,9 @@ app.get('/locate', function(req, res) {
     res.render('locate');
 });
 
+app.get('/view', function(req, res) {
+    res.render('view');
+})
 app.listen(8080, function() {
     console.log('Listening on localhost:8080');
 });
