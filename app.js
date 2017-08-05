@@ -38,6 +38,10 @@ app.get('/lastfm_cb', function(req, res) {
         // Record their API (session) key (this won't expire).
         // Use position as the value, eventually. Using a post request
 
+        // Technically we don't need their key to figure out what track they
+        // are currently listening to. However, if we just asked for
+        // username, any random person could assign location to a any user.
+
         // How SADD, we lost a key!!
         // Actually we just don't know its location yet. This is used to mark
         // a key as unplaced so that we can have a public API that sets
