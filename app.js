@@ -57,21 +57,43 @@ app.get('/lastfm_cb', function(req, res) {
     });
 });
 
+async function recordUserInfo(sk) {
+    // Make a request to the LastFM API and add user information to a
+    // separate hash / struct thing.
+    var res = await lfm.user_getInfo({sk: sk});
+
+    // Add user information for later query.
+    var userInfoPromise = rclient.hmsetAsync("sk:" + sk,
+        "username", res.user.name,
+        "realname", res.user.realname
+    );
+
+    // Get the user's recent tracks
+    var recentTracks = await lfm.user_getRecentTracks({
+        user: res.user.name
+    }) || {};
+    recentTracks = recentTracks.recenttracks || {};
+
+    // Get the first track
+    const track = recentTracks.track[0];
+    // Get track info
+    const song = LastFM.get_text(track, "name");
+    const artist = LastFM.get_text(track, "artist");
+    const album = LastFM.get_text(track, "album");
+    const nowplaying = LastFM.get_text(track, "nowplaying") || false;
+
+    console.log(res.user.name + " " + song + " " + artist + " " + album +
+        " nowplaying: " + nowplaying);
+}
+
 app.post('/set_key_location', async (req, res) => {
     var key = req.body.key;
     var long = req.body.longitude;
     var lat = req.body.latitude;
 
     try {
-        // While doing the geo stuff, make a request to the LastFM API and add
-        // user information to a separate hash / struct thing.
-        lfm.user_getInfo({sk: key}).then(async (res) => {
-            // Add user information for later query.
-            await rclient.hmsetAsync("sk:" + key,
-                "username", res.user.name,
-                "realname", res.user.realname
-            );
-        });
+        // While doing all the geo stuff, record user info in the background.
+        recordUserInfo(key);
 
         var numKeysRemoved = await rclient.sremAsync('lfg-lost-keys', key);
 
