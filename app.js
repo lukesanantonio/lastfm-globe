@@ -57,20 +57,26 @@ app.get('/lastfm_cb', function(req, res) {
     });
 });
 
+function user_hash(username) {
+    // Index by username!!
+    return "usr:"+username;
+}
+
 async function recordUserInfo(sk) {
     // Make a request to the LastFM API and add user information to a
     // separate hash / struct thing.
-    var res = await lfm.user_getInfo({sk: sk});
+    var userInfo = await lfm.user_getInfo({sk: sk}) || {};
+    userInfo = userInfo.user || {};
 
-    // Add user information for later query.
-    var userInfoPromise = rclient.hmsetAsync("sk:" + sk,
-        "username", res.user.name,
-        "realname", res.user.realname
-    );
+    // Get the username
+    const username = userInfo.name;
+    if(!username) {
+        throw "Failed to retrieve user information. Bad key?";
+    }
 
     // Get the user's recent tracks
     var recentTracks = await lfm.user_getRecentTracks({
-        user: res.user.name
+        user: username
     }) || {};
     recentTracks = recentTracks.recenttracks || {};
 
@@ -80,10 +86,30 @@ async function recordUserInfo(sk) {
     const song = LastFM.get_text(track, "name");
     const artist = LastFM.get_text(track, "artist");
     const album = LastFM.get_text(track, "album");
-    const nowplaying = LastFM.get_text(track, "nowplaying") || false;
+    const nowPlaying = LastFM.get_text(track, "nowplaying") || false;
 
-    console.log(res.user.name + " " + song + " " + artist + " " + album +
-        " nowplaying: " + nowplaying);
+    // Add user information and current song information for later query.
+    rclient.hmsetAsync(user_hash(username),
+        "username", username,
+        "realname", userInfo.realname,
+        "sk", sk,
+        "recentSong", song,
+        "recentArtist", artist,
+        "recentAlbum", album,
+        "recentNowPlaying", nowPlaying
+    );
+
+    if(nowPlaying) {
+        // Put this user on a priority queue to be processed.
+
+        // If they are currently listening it means they will probably continue
+        // to listen, and we should query their information more frequently.
+
+        // Remember,a user should only be in one queue at a time.
+        rclient.lpushAsync("priority-users", username);
+    } else {
+        rclient.lpushAsync("regular-users", username);
+    }
 }
 
 app.post('/set_key_location', async (req, res) => {
