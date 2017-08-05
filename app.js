@@ -127,7 +127,7 @@ app.post('/set_key_location', async (req, res) => {
             // Okay, attach geolocation to key
             var numKeysLocated = await rclient.geoaddAsync('lfg-geo', long, lat, key);
 
-            if(numKeysLocated == 1) {
+            if(numKeysLocated === 1) {
                 // All good
                 res.send("Success");
             } else {
