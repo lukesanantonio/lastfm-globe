@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
 const redis = require('redis');
+const crypto = require('crypto');
 
 const bluebird = require('bluebird');
 bluebird.promisifyAll(redis.RedisClient.prototype);
@@ -17,52 +18,28 @@ var lfm = new LastFM(
 );
 DEGREES_PER_KILOMETER = 111.325;
 
-app.set('view engine', 'pug');
+function InvalidMovementTokenError() {
+    this.message = "Invalid / old token";
+}
 
-app.use('/static', express.static(path.join(__dirname + '/static')));
-app.use('/public', express.static(path.join(__dirname + '/public')));
+// This queue is for user's that are actively listening so we should query
+// their recent tracks often.
+const PRIORITY_USER_QUEUE = "priority-users";
+// These users are not currently listening but may start sometime soon.
+const REGULAR_USER_QUEUE = "regular-users";
 
-app.use(bodyParser.json());
-
-app.get('/', function (req, res) {
-    res.render('index');
-});
-
-app.get('/lastfm_cb', function(req, res) {
-    const token = req.query.token;
-
-    lfm.auth_getSession(token).then(function(obj) {
-        // Okay, we've authenticated
-        const user_key = obj.session.key;
-
-        // Record their API (session) key (this won't expire).
-        // Use position as the value, eventually. Using a post request
-
-        // Technically we don't need their key to figure out what track they
-        // are currently listening to. However, if we just asked for
-        // username, any random person could assign location to a any user.
-
-        // How SADD, we lost a key!!
-        // Actually we just don't know its location yet. This is used to mark
-        // a key as unplaced so that we can have a public API that sets
-        // actual position of the user who the key belongs to. We won't allow
-        // reassigning location of key, so this makes it pretty safe. Someone
-        // won't know the key to use to reposition, etc.
-        rclient.sadd('lfg-lost-keys', user_key);
-
-        // Prompt the user to find their location
-        res.redirect('/locate?api_key='+user_key);
-    }).catch(function(err) {
-        res.send("error response: " + JSON.stringify(err));
-    });
-});
-
-function user_hash(username) {
+function userHash(username) {
     // Index by username!!
     return "usr:"+username;
 }
+function userChangeLocationToken(username) {
+    return "usr-token:" + username;
+}
+function createChangeLocationToken() {
+    return crypto.randomBytes(64).toString("hex");
+}
 
-async function recordUserInfo(sk) {
+async function requestUserInfoWithKey(sk) {
     // Make a request to the LastFM API and add user information to a
     // separate hash / struct thing.
     var userInfo = await lfm.user_getInfo({sk: sk}) || {};
@@ -73,6 +50,10 @@ async function recordUserInfo(sk) {
     if(!username) {
         throw "Failed to retrieve user information. Bad key?";
     }
+
+    // TODO: If we can't get the user's recent tracks for whatever reason,
+    // just exclude that from the returned object, maybe, or add a flag to
+    // see if it's required, etc.
 
     // Get the user's recent tracks
     var recentTracks = await lfm.user_getRecentTracks({
@@ -89,53 +70,130 @@ async function recordUserInfo(sk) {
     const nowPlaying = LastFM.get_text(track, "nowplaying") || false;
 
     // Add user information and current song information for later query.
-    rclient.hmsetAsync(user_hash(username),
-        "username", username,
-        "realname", userInfo.realname,
-        "sk", sk,
-        "recentSong", song,
-        "recentArtist", artist,
-        "recentAlbum", album,
-        "recentNowPlaying", nowPlaying
-    );
+    var userInfoObj = {
+        username: username,
+        realname: userInfo.realname,
+        sk: sk,
+        recentSong: song,
+        recentArtist: artist,
+        recentAlbum: album,
+        recentNowPlaying: nowPlaying
+    };
 
-    if(nowPlaying) {
+    // Return user information
+    return userInfoObj;
+}
+
+function getCachedUserInfoWithUsername(username) {
+    return rclient.hgetallAsync(userHash(username));
+}
+
+async function setUserInfo(userInfoObj) {
+    const username = userInfoObj.username;
+
+    rclient.hmsetAsync(userHash(username), userInfoObj);
+
+    // Remember, a user should only be in one queue at a time.
+
+    // Remove the user from any and all processing queues.
+
+    await Promise.all([
+        rclient.lremAsync(REGULAR_USER_QUEUE, 0, username),
+        rclient.lremAsync(PRIORITY_USER_QUEUE, 0, username)
+    ]);
+
+    if(userInfoObj.recentNowPlaying) {
         // Put this user on a priority queue to be processed.
 
         // If they are currently listening it means they will probably continue
         // to listen, and we should query their information more frequently.
-
-        // Remember,a user should only be in one queue at a time.
-        rclient.lpushAsync("priority-users", username);
+        rclient.lpushAsync(PRIORITY_USER_QUEUE, username);
     } else {
-        rclient.lpushAsync("regular-users", username);
+        // Don't worry about these guys.
+        rclient.lpushAsync(REGULAR_USER_QUEUE, username);
     }
 }
 
-app.post('/set_key_location', async (req, res) => {
-    var key = req.body.key;
+app.set('view engine', 'pug');
+
+app.use('/static', express.static(path.join(__dirname + '/static')));
+app.use('/public', express.static(path.join(__dirname + '/public')));
+
+app.use(bodyParser.json());
+
+app.get('/', function (req, res) {
+    res.render('index');
+});
+
+// Technically we don't need their key to figure out what track they are
+// currently listening to. However, if we just asked for username, any
+// random person could assign location to a any user.
+app.get('/lastfm_cb', function(req, res) {
+    const token = req.query.token;
+
+    lfm.auth_getSession(token).then(async (obj) => {
+        // Okay, we've authenticated
+        const user_key = obj.session.key;
+
+        // Request user info
+        var userInfoPromise = requestUserInfoWithKey(user_key);
+
+        // Record user info asynchronously.
+        userInfoPromise.then(async (info) => {
+            await setUserInfo(info);
+        });
+
+        var userInfo = await userInfoPromise;
+
+        // Generate a new movement token for this user and pass it to the
+        // client-side wizard with a query parameter.
+        var token = createChangeLocationToken();
+
+        // Mark it down so that the user can redeem it, at most, an hour later.
+        // This will overwrite any existing token!!
+        rclient.setexAsync(
+            userChangeLocationToken(userInfo.username), 3600, token
+        );
+
+        // Prompt the user to find their location
+        res.redirect('/locate?username='+userInfo.username+'&token='+token);
+    }).catch(function(err) {
+        res.send("error response: " + JSON.stringify(err));
+    });
+});
+
+app.post('/set_user_location', async (req, res) => {
+    var username = req.body.username;
+    var token = req.body.token;
     var long = req.body.longitude;
     var lat = req.body.latitude;
 
     try {
-        // While doing all the geo stuff, record user info in the background.
-        recordUserInfo(key);
+        var cachedToken = await rclient.getAsync(userChangeLocationToken(username));
+        if(cachedToken === token) {
+            // Okay, we can move this user
+            var numRemoved = await rclient.delAsync(
+                userChangeLocationToken(username)
+            );
 
-        var numKeysRemoved = await rclient.sremAsync('lfg-lost-keys', key);
-
-        if(numKeysRemoved >= 1) {
-            // Okay, attach geolocation to key
-            var numKeysLocated = await rclient.geoaddAsync('lfg-geo', long, lat, key);
-
-            if(numKeysLocated === 1) {
-                // All good
-                res.send("Success");
-            } else {
-                res.status(422).send("Bad location");
+            if(numRemoved !== 1) {
+                // Bah, something else just used up the token, oh well.
+                throw new InvalidMovementTokenError();
             }
+
+            // Wait for the user info to come in
+            var userInfo = await getCachedUserInfoWithUsername(username);
+
+            // Set new user location or update existing user location.
+            await rclient.geoaddAsync(
+                'lfg-geo', long, lat, userInfo.username
+            );
+
+            // All good
+            res.send("Success");
         } else {
             // Rip, we can't do anything with this key
-            res.status(422).send("Old key");
+            throw new InvalidMovementTokenError();
         }
     } catch(err) {
         res.status(422).send(err);
