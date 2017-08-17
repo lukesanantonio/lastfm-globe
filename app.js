@@ -18,20 +18,12 @@ var lfm = new LastFM(
 );
 DEGREES_PER_KILOMETER = 111.325;
 
+const common = require('./backend-common.js');
+
 function InvalidMovementTokenError() {
     this.message = "Invalid / old token";
 }
 
-// This queue is for user's that are actively listening so we should query
-// their recent tracks often.
-const PRIORITY_USER_QUEUE = "priority-users";
-// These users are not currently listening but may start sometime soon.
-const REGULAR_USER_QUEUE = "regular-users";
-
-function userHash(username) {
-    // Index by username!!
-    return "usr:"+username;
-}
 function userChangeLocationToken(username) {
     return "usr-token:" + username;
 }
@@ -51,55 +43,48 @@ async function requestUserInfoWithKey(sk) {
         throw "Failed to retrieve user information. Bad key?";
     }
 
+    // Add user information for later query.
+    var userInfoObj = {
+        username: username,
+        realname: userInfo.realname,
+        sk: sk
+    };
+
     // TODO: If we can't get the user's recent tracks for whatever reason,
     // just exclude that from the returned object, maybe, or add a flag to
     // see if it's required, etc.
 
     // Get the user's recent tracks
-    var recentTracks = await lfm.user_getRecentTracks({
-        user: username
-    }) || {};
-    recentTracks = recentTracks.recenttracks || {};
+    var recentTrack = common.unstupify_recent_tracks(
+        await lfm.user_getRecentTracks({ user: username })
+    )[0] || {};
 
-    // Get the first track
-    const track = recentTracks.track[0];
-    // Get track info
-    const song = LastFM.get_text(track, "name");
-    const artist = LastFM.get_text(track, "artist");
-    const album = LastFM.get_text(track, "album");
-    const nowPlaying = LastFM.get_text(track, "nowplaying") || false;
-
-    // Add user information and current song information for later query.
-    var userInfoObj = {
-        username: username,
-        realname: userInfo.realname,
-        sk: sk,
-        recentSong: song,
-        recentArtist: artist,
-        recentAlbum: album,
-        recentNowPlaying: nowPlaying
-    };
+    // Add track info too!
+    Object.assign(userInfoObj, common.make_user_recent_track_info(recentTrack));
 
     // Return user information
     return userInfoObj;
 }
 
 function getCachedUserInfoWithUsername(username) {
-    return rclient.hgetallAsync(userHash(username));
+    return rclient.hgetallAsync(common.userHash(username));
 }
 
 async function setUserInfo(userInfoObj) {
     const username = userInfoObj.username;
 
-    rclient.hmsetAsync(userHash(username), userInfoObj);
+    rclient.hmsetAsync(common.userHash(username), userInfoObj);
 
     // Remember, a user should only be in one queue at a time.
 
     // Remove the user from any and all processing queues.
+    // If this user is currently being processed we may end up with a
+    // duplicate in the store. That's fine, we'll need to clean those up at
+    // some point, or not.
 
     await Promise.all([
-        rclient.lremAsync(REGULAR_USER_QUEUE, 0, username),
-        rclient.lremAsync(PRIORITY_USER_QUEUE, 0, username)
+        rclient.lremAsync(common.REGULAR_USER_QUEUE, 0, username),
+        rclient.lremAsync(common.PRIORITY_USER_QUEUE, 0, username)
     ]);
 
     if(userInfoObj.recentNowPlaying) {
@@ -107,10 +92,10 @@ async function setUserInfo(userInfoObj) {
 
         // If they are currently listening it means they will probably continue
         // to listen, and we should query their information more frequently.
-        rclient.lpushAsync(PRIORITY_USER_QUEUE, username);
+        rclient.rpushAsync(common.PRIORITY_USER_QUEUE, username);
     } else {
         // Don't worry about these guys.
-        rclient.lpushAsync(REGULAR_USER_QUEUE, username);
+        rclient.rpushAsync(common.REGULAR_USER_QUEUE, username);
     }
 }
 
