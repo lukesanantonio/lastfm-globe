@@ -212,16 +212,17 @@ app.get('/globe', async (req, res) => {
         // For each user, asynchronously grab their user information and pair
         // it with their location.
         promises.push(new Promise(async (resolve, reject) => {
-            const user = users[i];
+            const username = users[i][0];
+            const loc = users[i][1];
 
             // Query user information by key
-            var user_obj = await rclient.hgetallAsync("sk:" + user[0]) || {};
-            user_obj.key = user[0];
+            var user_obj =
+                await rclient.hgetallAsync(common.userHash(username)) || {};
 
             resolve({
                 "user": user_obj,
-                "longitude": parseFloat(user[1][0]),
-                "latitude": parseFloat(user[1][1]),
+                "longitude": parseFloat(loc[0]),
+                "latitude": parseFloat(loc[1]),
             });
         }));
     }
